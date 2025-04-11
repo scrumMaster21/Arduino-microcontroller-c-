@@ -1,0 +1,120 @@
+             ΚΩΔΙΚΑΣ 
+   To running mode και to single mode θα χρησιμοποιούνται εν αλλάξ στον κώδικα. Για το running mode θα ελέγχουμε μέσω του αποτελέσματος RESULT αν γίνει μικρότερο από 10. Για το single mode θα ελέγχουμε αν αυτό θα γίνει μεγαλύτερο από 5. Eδώ το Χ θα είναι 6 μέγιστο, διότι η συσκευή θα στρίψει 6 φορές μέσω του running mode δηλαδή του μπροστά αισθητήρα. Όλο αυτό θα μπεί μέσα σε ένα while. Στην single mode ο adc σταματάει τη λειτουργία μόνος του. Για να ξέρουμε από πού προήρθε η διακοπή και άρα να ξέρουμε προς τα ποια κατεύθυνση θα στρίψουμε θέτουμε τη μεταβλητή y. Ανάλογα την τιμή της που τη θέτουμε σε κάθε νέα λειτουργία του adc ξέρουμε που να πάμε , και το υλοποιούμε βάζοντας ένα if στην κατάλληλη isr. Αυτή η εντολή ADC0.CTRLA ^= ADC_FREERUN_bm; αντί για |= αντιστρέφει το συγκεκριμένο bit για να σταματήσει το running mode. Επίσης θέτουμε το νήμα σε 5. Και αλλάζοντας το WINLT σε WINΗT θέτουμε τον ADC να κάνει διακοπή όταν RESULT<WINLT.
+
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
+#define del 10
+int x=0;
+int y;
+interr=0;
+int main() {
+PORTD.DIR |= PIN0_bm; // pin is output
+PORTD.DIR |= PIN1_bm; // pin is output
+PORTD.DIR |= PIN2_bm; // pin is output
+while {
+y=0;
+//initialize the ADC for free=running mode
+ADC0.CTRLA |= ADC_RESSEL_10BIT_gc; //10-bit resolution
+ADC0.CTRLA |= ADC_FREERUN_bm; // Free-Running mode enabled
+ADC0.CTRLA |= ADC_ENABLE_bm; //Enable ADC
+ADC0.MUXPOS |= ADC_MUXPOS_AIN7_gc; // The bit enable debug mode
+ADC0.DBGCTRL |= ADC_DBGRUN_bm; //Window comparator mode
+ADC0.WINLT |= 10; //set threshold 
+ADC0.INTCTRL |= ADC_WCMP_bm; // Enable Interrupts for WCM
+ADC0.CTRLE |= ADC_WINCM0_bm; //Interrupt when RESULT<WINLT
+sei();//begin accepting interrupts
+ADC0.COMMAND |= ADC_STCONV_bm; // Start Conversion
+  PORTD.OUTCLR=PIN0_bm; //Straight 
+_delay_ms(100);
+y=1;
+ //initialize the ADC for single mode
+ADC0.CTRLA |= ADC_RESSEL_10BIT_gc; //10-bit resolution
+ADC0.CTRLA ^= ADC_FREERUN_bm; // This will flip the Free-Running mode bit into disenabled, changing the bit1 to zero
+ADC0.CTRLA |= ADC_ENABLE_bm; //Enable ADC
+ADC0.MUXPOS |= ADC_MUXPOS_AIN7_gc; // The bit enable debug mode
+ADC0.DBGCTRL |= ADC_DBGRUN_bm; //Window comparator mode
+ADC0.WINHT |= 5; //set threshold We change winlt to winht for result>winht
+ADC0.INTCTRL |= ADC_WCMP_bm; // Enable Interrupts for WCM
+ADC0.CTRLE |= ADC_WINCM0_bm; //Interrupt when RESULT>WINLT
+sei();//begin accepting interrupts
+ADC0.COMMAND |= ADC_STCONV_bm; // Start Conversion
+  PORTD.OUTCLR=PIN0_bm; //Straight
+}
+label;
+}
+
+ISR(ADC0_WCOMP_vect){
+int intflags = ADC0.INTFLAGS;
+ADC0.INTFLAGS= intflags;
+x=x+1;
+
+if(x!=6){
+if (y==0){
+PORTD.OUT=PIN0_bm; //Led is off
+PORTD.OUTCLR=PIN1_bm; //Left 
+//_delay_ms(100);
+interr=0;
+// 16 bit counter
+TCA0.SINGLE.CNT=0; //clear counter
+TCA0.SINGLE.CTRLB=0; //Normal Mode 
+TCA0.SINGLE.CMP0 =ped; // When reaches this value -> interrupt clock frequency/1024 
+TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1024_gc;
+TCA0.SINGLE.CTRLA|=1;//Enable
+TCA0.SINGLE.INTCTRL= TCA_SINGLE_CMP0_bm; //Interrupt Enable 
+sei();//begin accepting interrupt signals
+while(interr==0){
+PORTD.OUT |= PIN1_bm;//Led is off
+PORTD.OUTCLR=PIN0_bm; //Straight}
+}
+else {
+PORTD.OUT=PIN0_bm; //Led is off
+PORTD.OUTCLR=PIN2_bm; //right 
+//_delay_ms(100);
+interr=0;
+// 16 bit counter
+TCA0.SINGLE.CNT=0; //clear counter
+TCA0.SINGLE.CTRLB=0; //Normal Mode 
+TCA0.SINGLE.CMP0 =ped; // When reaches this value -> interrupt clock frequency/1024 
+TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1024_gc;
+TCA0.SINGLE.CTRLA|=1;//Enable
+TCA0.SINGLE.INTCTRL= TCA_SINGLE_CMP0_bm; //Interrupt Enable 
+sei();//begin accepting interrupt signals
+while(interr==0){
+PORTD.OUT |= PIN2_bm;//Led is off
+PORTD.OUTCLR=PIN0_bm; //Straight}
+}
+
+}
+}
+else
+{
+interr=0;
+// 16 bit counter
+TCA0.SINGLE.CNT=0; //clear counter
+TCA0.SINGLE.CTRLB=0; //Normal Mode 
+TCA0.SINGLE.CMP0 =ped; // When reaches this value -> interrupt clock frequency/1024 
+TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1024_gc;
+TCA0.SINGLE.CTRLA|=1;//Enable
+TCA0.SINGLE.INTCTRL= TCA_SINGLE_CMP0_bm; //Interrupt Enable 
+sei();//begin accepting interrupt signals
+while(interr==0){
+PORTD.OUTCLR=PIN0_bm;  //while counter on, turn around
+PORTD.OUTCLR=PIN1_bm; 
+PORTD.OUTCLR=PIN2_bm; }
+
+PORTD.OUT=PIN0_bm;  //disable all leds
+PORTD.OUT=PIN1_bm; 
+PORTD.OUT=PIN2_bm;
+}
+}
+ISR(TCA0_CMP0_vect){
+TCA0.SINGLE.CTRLA=0; //Disable
+//clear flag
+int intflags= TCA0.SINGLE.INTFLAGS;
+TCA0.SINGLE.INTFLAGS=intflags;
+interr=1;
+if(x==4){
+goto label; }
+}
+
